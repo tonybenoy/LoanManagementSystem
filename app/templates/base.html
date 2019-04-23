@@ -1,0 +1,22 @@
+<html>
+
+<head>
+    {% if title %}
+    <title>{{ title }} - Loan Management</title>
+    {% else %}
+    <title>Loan Management</title>
+    {% endif %}
+</head>
+
+<body>
+    <div>Loan Management: <a href="/index">Loans</a></div>
+    {% if current_user.is_anonymous %}
+    <a href="{{ url_for('login') }}">Login</a>
+    {% else %}
+    <a href="{{ url_for('logout') }}">Logout</a>
+    {% endif %}
+    <hr>
+    {% block content %}{% endblock %}
+</body>
+
+</html>
