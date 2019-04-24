@@ -1,5 +1,5 @@
 import datetime
-from app import db
+from app import db,ma
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 from app import login
@@ -16,7 +16,7 @@ class User(UserMixin, db.Model):
     type_of_user = db.Column(db.Integer, nullable=False)
     create_date = db.Column(db.DateTime, nullable=False)
     edit_date = db.Column(db.DateTime, nullable=False)
-    edit_uid = db.Column(db.Integer)
+    edit_uid =  db.Column(db.Integer, db.ForeignKey('user.id'))
     def __init__(self, username, email, type_of_user=TYPE['customer']):
         self.username = username
         self.email = email
@@ -36,3 +36,6 @@ class User(UserMixin, db.Model):
     @login.user_loader
     def load_user(id):
         return User.query.get(int(id))
+class UserSchema(ma.Schema):
+    class Meta:
+        fields = ("email", "create_date", "username", "edit_date", "edit_date","edit_uid", "type_of_user")

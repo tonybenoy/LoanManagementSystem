@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div>
+    <p>UserName : {{user.username}} </p>
+    <p>Email : {{user.email}} </p>
+    {% if current_user.type_of_user in [1,2] %}
+    <p>Created On : {{user.create_date}} </p>
+    <p>Last Edit on : {{user.edit_date}}</p>
+    <p>Last Edit by : {{user.edit_uid}}</p>
+    {%endif%}
+    <a href="/edit_profile/{{ user.username }}">Edit Profile</a>
+</div>
+{% endblock %}

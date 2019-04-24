@@ -8,6 +8,11 @@ class LoginForm(FlaskForm):
                              DataRequired()])
     remember_me = BooleanField('Remember Me')
     submit = SubmitField('Sign In')
+class ProfileForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()])
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    type_of_user = RadioField("User Type",choices=[("2","Admin"),("0","Customer"),("1","Agent")])
+    submit = SubmitField('Update')
 
 class RegistrationForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired()])
