@@ -17,6 +17,7 @@
         <span style="color: red;">[{{ error}}]</span>
         {% endfor %}
     </p>
+    {% if current_user.type_of_user in[2]%}
     <p>
         {{ form.type_of_user.label }}<br>
         {{ form.type_of_user() }}<br>
@@ -24,6 +25,7 @@
         <span style="color: red;">[{{ error }}]</span>
         {% endfor %}
     </p>
+    {%endif%}
     <p>{{ form.submit() }}</p>
 </form>
 {% endblock %}

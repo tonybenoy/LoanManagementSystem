@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import SelectField, BooleanField, SubmitField, IntegerField, PasswordField, RadioField, StringField
+from wtforms import SelectField, FloatField,BooleanField, SubmitField, IntegerField, PasswordField, RadioField, StringField
 from wtforms.validators import DataRequired, Email, EqualTo, ValidationError, Length
 from app.models import User
 class LoginForm(FlaskForm):
@@ -13,6 +13,16 @@ class ProfileForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     type_of_user = RadioField("User Type",choices=[("2","Admin"),("0","Customer"),("1","Agent")])
     submit = SubmitField('Update')
+
+class LoanForm(FlaskForm):
+    user = SelectField("Customer", validators=[DataRequired()])
+    principle = FloatField('Principle', validators=[DataRequired()])
+    roi = FloatField('Rate Of interest', validators=[DataRequired()])
+    tenure = IntegerField("Tenure",validators=[DataRequired()])
+    submit = SubmitField('Create')
+    def __init__(self, userchoices):
+       super(LoanForm, self).__init__()
+       self.user.choices = userchoices
 
 class RegistrationForm(FlaskForm):
     username = StringField("Username", validators=[DataRequired()])

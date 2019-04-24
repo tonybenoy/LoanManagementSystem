@@ -1,4 +1,5 @@
 import datetime
+import math
 from app import db,ma
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
@@ -17,9 +18,10 @@ class User(UserMixin, db.Model):
     create_date = db.Column(db.DateTime, nullable=False)
     edit_date = db.Column(db.DateTime, nullable=False)
     edit_uid =  db.Column(db.Integer, db.ForeignKey('user.id'))
+    loans = db.relationship("Loan", backref="loan", lazy='dynamic')
     def __init__(self, username, email, type_of_user=TYPE['customer']):
         self.username = username
-        self.email = email
+        self.email = email  
         self.type_of_user = type_of_user
         self.edit_date = datetime.datetime.utcnow()
         self.create_date = datetime.datetime.utcnow()
@@ -39,3 +41,42 @@ class User(UserMixin, db.Model):
 class UserSchema(ma.Schema):
     class Meta:
         fields = ("email", "create_date", "username", "edit_date", "edit_date","edit_uid", "type_of_user")
+
+STATE = {
+    'New': 0,
+    'Rejected': 1,
+    'Approved': 2
+}
+
+class Loan(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    principle = db.Column(db.Float, nullable=False)
+    roi = db.Column(db.Float, nullable=False)
+    create_date = db.Column(db.DateTime, nullable=False)
+    edit_date = db.Column(db.DateTime, nullable=False)
+    tenure = db.Column(db.Integer, nullable=False)
+    state = db.Column(db.Integer, nullable=False)
+    user = db.Column(db.Integer,db.ForeignKey("user.id"))
+    create_uid =  db.Column(db.Integer)
+    edit_uid = db.Column(db.Integer)
+    emi = db.Column(db.Float)
+    total_amount = db.Column(db.Float)
+    def __init__(self, tenure,principle, roi,user, state=STATE['New']):
+        self.user = user
+        self.principle = principle
+        self.roi = roi
+        self.state = state
+        self.tenure=tenure
+        self.edit_date = datetime.datetime.utcnow()
+        self.create_date = datetime.datetime.utcnow()
+    def emicalc(self):
+        self.emi=(self.principle * (math.pow((1 + self.roi / 100), self.tenure))-self.principle)/self.tenure
+        self.total_amount = self.principle * (math.pow((1 + self.roi / 100), self.tenure))
+    def createuid(self,userid):
+        self.create_uid=userid
+    def __repr__(self):
+        return '<Loan {}>'.format(self.id)
+
+class UserSchema(ma.Schema):
+    class Meta:
+        fields = ("roi", "create_date", "loan_transaction", "edit_date", "tenure", "id","principle")

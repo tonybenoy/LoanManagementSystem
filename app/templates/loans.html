@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div>
+    <table style="width:100%">
+        <tr>
+            <th>Loan For</th>
+            <th>Principle</th>
+            <th>Monthly Emi</th>
+            <th>Tenure(In Months)</th>
+            <th>Rate of Interest</th>
+            <th>Status</th>
+            <th>Total</th>
+        </tr>
+        {%for loan in loans%}
+        <tr>
+            <td>{{loan.user}}</td>
+            <td>{{loan.principle}}</td>
+            <td>{{loan.emi}}</td>
+            <td>{{loan.tenure}}</td>
+            <td>{{loan.roi}}</td>
+            {%if loan.state == 0 %}
+            <td>New</td>
+            {%endif%}
+            {%if loan.state == 1 %}
+            <td>Rejected</td>
+            {%endif%}
+            {%if loan.state == 3 %}
+            <td>Accepted</td>
+            {%endif%}
+            <td>{{loan.total_amount}}</td>
+        </tr>
+        {%endfor%}
+    </table>
+</div>
+{% endblock %}

@@ -3,8 +3,8 @@ from flask_login import login_user,current_user,logout_user,login_required # Log
 from werkzeug.urls import url_parse
 import datetime
 from app import app,login,db
-from app.forms import LoginForm, ProfileForm, RegistrationForm
-from app.models import User,UserSchema
+from app.forms import LoginForm, ProfileForm, RegistrationForm,LoanForm
+from app.models import User,UserSchema,Loan
 
 user_schema = UserSchema()
 users_schema = UserSchema(many=True)
@@ -66,11 +66,44 @@ def register():
     if form.validate_on_submit():
         user = User(username=form.username.data, email=form.email.data)
         user.set_password(form.password.data)
-        db.session.add(user)
+        db.session.add(user)    
         db.session.commit()
         flash('Congratulations, you are now a registered user!')
         return redirect(url_for('login'))
     return render_template('register.html', title='Register', form=form)
+
+
+@app.route("/createloan",methods=['GET', 'POST'])
+@login_required
+def createloan():
+
+    users =[]
+    for user in User.query.filter_by(type_of_user=0).all():
+        users.append((str(user.id),user.username))
+    form = LoanForm(users)
+    if current_user.type_of_user == 1:
+        if form.validate_on_submit():
+            loan = Loan(user=int(form.user.data),principle=form.principle.data, roi=form.roi.data, tenure=form.tenure.data)
+            loan.createuid(current_user.id)
+            loan.emicalc()
+            db.session.add(loan)    
+            db.session.commit()
+            flash('Loan Created')
+            return redirect(url_for('index'))
+        return render_template('createloan.html', title='Create Loan', form=form)
+    else:
+        flash('You are not authorised to view this!')
+        return redirect(url_for('index'))
+
+
+@app.route("/loans",methods=['GET'])
+def loans():
+    if current_user.type_of_user in [1, 2]:
+        loans = Loan.query.all()
+    else:
+        loans = Loan.query.filter_by(user=current_user.id).all()
+    print(loans)
+    return render_template("loans.html",Title="Loans",loans=loans)
 
 @app.route('/edit_profile/<username>', methods=['GET', 'POST'])
 @login_required
@@ -82,7 +115,8 @@ def edit_profile(username):
             user.username = form.username.data
             user.email = form.email.data
             user.edit_date = datetime.datetime.utcnow()
-            user.type_of_user = int(form.type_of_user.data)
+            if current_user.type_of_user in [2]:
+                user.type_of_user = int(form.type_of_user.data)
             user.edit_uid = current_user.id
             db.session.commit()
             flash('Your changes have been saved.')
