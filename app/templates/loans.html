@@ -14,7 +14,8 @@
         </tr>
         {%for loan in loans%}
         <tr>
-            <td>{{loan.user}}</td>
+            <td><a href="/editprofile/{{user.query.get(loan.user).username}}">{{user.query.get(loan.user).username}}</a>
+            </td>
             <td>{{loan.principle}}</td>
             <td>{{loan.emi}}</td>
             <td>{{loan.tenure}}</td>
@@ -25,10 +26,14 @@
             {%if loan.state == 1 %}
             <td>Rejected</td>
             {%endif%}
-            {%if loan.state == 3 %}
+            {%if loan.state == 2 %}
             <td>Accepted</td>
             {%endif%}
+            {%if current_user.type_of_user != 0%}
+            <td><a href="/editloan/{{loan.id}}">{{loan.total_amount}}</a></td>
+            {%else%}
             <td>{{loan.total_amount}}</td>
+            {%endif%}
         </tr>
         {%endfor%}
     </table>

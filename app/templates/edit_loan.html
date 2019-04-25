@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<h1> Edit</h1>
+<form action="" method="post">
+    {{form.hidden_tag() }}
+    {% if current_user.type_of_user == 2%}
+    <p>
+        {{ form.tenure.label }}
+        {{form.tenure.data}}
+    </p>
+    <p>
+        {{ form.roi.label }}
+        {{form.roi.data}}
+    </p>
+    <p>
+        {{ form.principle.label }}
+        {{form.principle.data}}
+    </p>
+    {%endif%}
+    {% if current_user.type_of_user == 1%}
+    <p>
+        {{ form.tenure.label }}<br>
+        {{ form.tenure() }} <br>
+        {% for error in form.tenure.errors %}
+        <span style="color: red;">[{{ error}}]</span>
+        {% endfor %}
+    </p>
+    <p>
+        {{ form.roi.label }}<br>
+        {{ form.roi() }}<br>
+        {% for error in form.roi.errors %}
+        <span style="color: red;">[{{ error}}]</span>
+        {% endfor %}
+    </p>
+    <p>
+        {{ form.principle.label }}<br>
+        {{ form.principle() }}<br>
+        {% for error in form.principle.errors %}
+        <span style="color: red;">[{{ error }}]</span>
+        {% endfor %}
+    </p>
+    <p>{{ form.submit() }}</p>
+    {%endif%}
+
+    {% if current_user.type_of_user == 2 and state == 0 %}
+    <p>{{ form.approve() }}</p>
+    <p>{{ form.reject() }}</p>
+    {%endif%}
+</form>
+{% endblock %}

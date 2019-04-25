@@ -16,10 +16,17 @@
 </head>
 
 <body>
-    <div>Loan Management: <a href="/index">Loans</a>
+    <div> <a href="/index">Home:</a>
         {% if current_user.is_anonymous %}
         <a href="{{ url_for('login') }}">Login</a>
         {% else %}
+        {%if current_user.type_of_user in [1,2]%}
+        <a href="{{ url_for('users') }}">Users</a>
+        {% endif %}
+        {%if current_user.type_of_user in [1]%}
+        <a href="{{ url_for('createloan') }}">Create Loan</a>
+        {% endif %}
+        <a href="{{ url_for('loans') }}">Loans</a>
         <a href="{{ url_for('user', username=current_user.username) }}">Profile</a>
         <a href="{{ url_for('logout') }}">Logout</a>
         {% endif %}

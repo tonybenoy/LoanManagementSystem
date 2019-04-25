@@ -3,18 +3,18 @@ from flask_login import login_user,current_user,logout_user,login_required # Log
 from werkzeug.urls import url_parse
 import datetime
 from app import app,login,db
-from app.forms import LoginForm, ProfileForm, RegistrationForm,LoanForm
+from app.forms import LoginForm, ProfileForm, RegistrationForm,LoanForm,EditLoanForm
 from app.models import User,UserSchema,Loan
 
 user_schema = UserSchema()
 users_schema = UserSchema(many=True)
 
-@app.route('/', methods=['GET', 'POST'])
-@app.route('/index', methods=['GET', 'POST'])
+@app.route('/', methods=['GET'])
+@app.route('/index', methods=['GET'])
 def index():
     return render_template("index.html")
 
-@app.route('/users',methods=['GET','POST'])
+@app.route('/users',methods=['GET'])
 @login_required
 def users():
     if current_user.type_of_user in [1,2]:
@@ -24,7 +24,7 @@ def users():
         flash('You are not authorised to view this!')
         return redirect(url_for('index'))
 
-@app.route('/user/<username>',methods=['GET','POST'])
+@app.route('/user/<username>',methods=['GET'])
 @login_required
 def user(username):
     if current_user.type_of_user in [1,2] or username == current_user.username:
@@ -52,6 +52,7 @@ def login():
     return render_template('login.html', title='Sign In', form=form)
 
 @app.route('/logout')
+@login_required
 def logout():
     logout_user()
     return redirect(url_for('index'))
@@ -76,11 +77,7 @@ def register():
 @app.route("/createloan",methods=['GET', 'POST'])
 @login_required
 def createloan():
-
-    users =[]
-    for user in User.query.filter_by(type_of_user=0).all():
-        users.append((str(user.id),user.username))
-    form = LoanForm(users)
+    form = LoanForm()
     if current_user.type_of_user == 1:
         if form.validate_on_submit():
             loan = Loan(user=int(form.user.data),principle=form.principle.data, roi=form.roi.data, tenure=form.tenure.data)
@@ -95,17 +92,16 @@ def createloan():
         flash('You are not authorised to view this!')
         return redirect(url_for('index'))
 
-
-@app.route("/loans",methods=['GET'])
+@app.route("/loans",methods=['GET','POST'])
+@login_required
 def loans():
     if current_user.type_of_user in [1, 2]:
         loans = Loan.query.all()
     else:
         loans = Loan.query.filter_by(user=current_user.id).all()
-    print(loans)
-    return render_template("loans.html",Title="Loans",loans=loans)
+    return render_template("loans.html",Title="Loans",user=User,loans=loans)
 
-@app.route('/edit_profile/<username>', methods=['GET', 'POST'])
+@app.route('/editprofile/<username>', methods=['GET', 'POST'])
 @login_required
 def edit_profile(username):
     form = ProfileForm()
@@ -135,3 +131,43 @@ def edit_profile(username):
             flash('You are not authorised to view this!')
             return redirect(url_for('index'))
 
+@app.route('/editloan/<loanid>', methods=['GET', 'POST'])
+@login_required
+def editloan(loanid):
+    form = EditLoanForm()
+    if request.method == 'POST':
+        if current_user.type_of_user != 0:
+            loan = Loan.query.filter_by(id=loanid).first_or_404()
+            if form.approve.data == True and current_user.type_of_user == 2:
+                loan.state = 2
+                db.session.commit()
+                return redirect(url_for('editloan',loanid=loan.id))
+            elif form.reject.data == True and current_user.type_of_user == 2:
+                loan.state = 1
+                db.session.commit()
+                return redirect(url_for('editloan',loanid=loan.id))
+            elif form.submit.data == True and current_user.type_of_user == 1:
+                loan.roi = form.roi.data
+                loan.tenure = form.tenure.data
+                loan.principle = form.principle.data
+                loan.edit_date = datetime.datetime.utcnow()
+                loan.edit_uid = current_user.id
+                db.session.commit()
+                flash('Your changes have been saved.')
+                return redirect(url_for('editloan',loanid=loan.id))
+            else:
+                flash('Incorrect output.')
+                return redirect(url_for('index'))
+        else:
+            flash("Unauthorised Request")
+            return redirect(url_for("index"))
+    elif request.method == 'GET':
+        STATE = {   0:'New',
+                    1: 'Rejected',
+                    2:'Approved' }
+        loan = Loan.query.filter_by(id=loanid).first_or_404()
+        form.tenure.data = loan.tenure
+        form.principle.data = loan.principle
+        form.roi.data = loan.roi
+        state = STATE[loan.state]
+        return render_template('edit_loan.html', title='Edit Loan',form=form,state=state)
