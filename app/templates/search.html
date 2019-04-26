@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h1> Search</h1>
+<form action="" method="post">
+    {{form.hidden_tag() }}
+    <p>
+
+        {{ form.user.label }}<br>
+        {{ form.user() }} <br>
+        {% for error in form.user.errors %}
+        <span style="color: red;">[{{ error}}]</span>
+        {% endfor %}
+    </p>
+    <p>
+        {{ form.createdate.label }}<br>
+        {{ form.createdate() }}<br>
+        {% for error in form.createdate.errors %}
+        <span style="color: red;">[{{ error}}]</span>
+        {% endfor %}
+    </p>
+    <p>
+        {{ form.updatedate.label }}<br>
+        {{ form.updatedate() }}<br>
+        {% for error in form.updatedate.errors %}
+        <span style="color: red;">[{{ error }}]</span>
+        {% endfor %}
+    </p>
+    <p>
+        {{ form.state.label }}<br>
+        {{ form.state() }}<br>
+        {% for error in form.state.errors %}
+        <span style="color: red;">[{{ error }}]</span>
+        {% endfor %}
+    </p>
+    <p>{{ form.submit() }}</p>
+</form>
+{% endblock %}

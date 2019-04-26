@@ -13,6 +13,10 @@
             border: 1px solid black;
         }
     </style>
+    {% block scripts %}
+    {{ super() }}
+    {{ moment.include_moment() }}
+    {% endblock %}
 </head>
 
 <body>
@@ -26,6 +30,7 @@
         {%if current_user.type_of_user in [1]%}
         <a href="{{ url_for('createloan') }}">Create Loan</a>
         {% endif %}
+        <a href="{{ url_for('search') }}">Search</a>
         <a href="{{ url_for('loans') }}">Loans</a>
         <a href="{{ url_for('user', username=current_user.username) }}">Profile</a>
         <a href="{{ url_for('logout') }}">Logout</a>

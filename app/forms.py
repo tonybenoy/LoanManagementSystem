@@ -1,4 +1,6 @@
 from flask_wtf import FlaskForm
+import datetime
+from flask_login import current_user
 from wtforms import SelectField, FloatField,BooleanField, SubmitField, IntegerField, PasswordField, RadioField, StringField,DateField
 from wtforms.validators import DataRequired, Email, EqualTo, ValidationError, Length
 from app.models import User
@@ -29,10 +31,20 @@ class LoanForm(FlaskForm):
 
 class FilterForm(FlaskForm):
     user = SelectField("Customer")
-    createdate = DateField("Date Created")
-    updatedate = DateField("Date updated")
+    createdate = DateField("Date Created",default=datetime.datetime.utcnow() ,format='%Y-%m-%d')
+    updatedate = DateField("Date updated",default=datetime.datetime.utcnow(), format='%Y-%m-%d')
     state = SelectField("State",choices=[("1","Accepted"),("0","New"),("2","Rejected"),("All","All")])
     submit = SubmitField("Search")
+    
+    def __init__(self):
+        super(FilterForm, self).__init__()
+        if current_user.type_of_user == 0:
+            users =[(str(current_user.id),current_user.username)]
+        else:
+            users = [("All","All")]
+            for user in User.query.filter_by(type_of_user=0).all():
+                users.append((str(user.id),user.username))
+        self.user.choices = users
 class EditLoanForm(FlaskForm):
     principle = FloatField('Principle', validators=[DataRequired()])
     roi = FloatField('Rate Of interest', validators=[DataRequired()])
