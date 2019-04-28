@@ -29,6 +29,7 @@ class Loan(db.Model):
     edit_uid = db.Column(db.Integer)
     emi = db.Column(db.Float)
     total_amount = db.Column(db.Float)
+
     def __init__(self, tenure,principle, roi,user, state=STATE['New']):
         self.user = user
         self.principle = principle
@@ -49,6 +50,23 @@ class LoanSchema(ma.ModelSchema):
     class Meta:
         model = Loan
         include_fk = True
+class LoanRollback(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    principle = db.Column(db.Float, nullable=False)
+    roi = db.Column(db.Float, nullable=False)
+    tenure = db.Column(db.Integer, nullable=False)
+    loan = db.Column(db.Integer,db.ForeignKey("loan.id"))
+    
+    def __init__(self, parent,tenure,principle, roi):
+        self.principle = principle
+        self.roi = roi
+        self.tenure = tenure
+        self.loan = parent
+
+    def __repr__(self):
+        return '<LoanBackup {}>'.format(self.id)
+
+
 
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)

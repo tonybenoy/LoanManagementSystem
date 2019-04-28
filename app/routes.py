@@ -1,12 +1,12 @@
 from flask import render_template, flash, redirect,url_for,request,jsonify,make_response
 from flask_login import login_user,current_user,logout_user,login_required # Login and session management 
 from werkzeug.urls import url_parse
-import datetime
-import jwt
+import datetime 
+import jwt # For jwt
 from functools import wraps
 from app import app,login,db
 from app.forms import LoginForm, ProfileForm, RegistrationForm, LoanForm, EditLoanForm, FilterForm
-from app.models import User,UserSchema,Loan,LoanSchema
+from app.models import User,UserSchema,Loan,LoanSchema,LoanRollback
 
 user_schema = UserSchema(strict=True,exclude=['password_hash'])
 users_schema = UserSchema(many=True,strict=True,exclude=['password_hash'])
@@ -16,11 +16,15 @@ loans_schema = LoanSchema(many=True, strict=True)
 @app.route('/', methods=['GET'])
 @app.route('/index', methods=['GET'])
 def index():
+    """Endpoint for home
+    """
     return render_template("index.html")
 
 @app.route('/users',methods=['GET'])
 @login_required
 def users():
+    """Endpoint to get all users
+    """
     if current_user.type_of_user in [1,2]:
         result = User.query.all()
         return render_template("users.html",users=result)
@@ -31,6 +35,8 @@ def users():
 @app.route('/user/<username>',methods=['GET'])
 @login_required
 def user(username):
+    """Endpoint to get information of a specific user
+    """
     if current_user.type_of_user in [1,2] or username == current_user.username:
         user = User.query.filter_by(username=username).first_or_404()
         return render_template("user.html",user=user)
@@ -40,6 +46,8 @@ def user(username):
 
 @app.route('/login',methods=['GET','POST'])
 def login():
+    """Endpoint to  log the user in
+    """
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     form = LoginForm()
@@ -58,6 +66,8 @@ def login():
 @app.route('/logout')
 @login_required
 def logout():
+    """TO logout the user
+    """
     logout_user()
     return redirect(url_for('index'))
     if current_user.is_authenticated:
@@ -65,6 +75,8 @@ def logout():
     
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    """Endpoint to register/add more users to the system
+    """
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     form = RegistrationForm()
@@ -81,6 +93,8 @@ def register():
 @app.route("/createloan",methods=['GET', 'POST'])
 @login_required
 def createloan():
+    """Endpoint to create loans
+    """
     form = LoanForm()
     if current_user.type_of_user == 1:
         if form.validate_on_submit():
@@ -99,6 +113,8 @@ def createloan():
 @app.route('/search', methods=['GET', 'POST'])
 @login_required
 def search():
+    """Endpoint to filter out loan results
+    """
     form = FilterForm()
     if form.validate_on_submit():
         if current_user.type_of_user == 0:
@@ -127,6 +143,8 @@ def search():
 @app.route("/loans",methods=['GET','POST'])
 @login_required
 def loans():
+    """Endpoint to get all loans. No filtering except usertype
+    """
     if current_user.type_of_user in [1, 2]:
         loans = Loan.query.all()
     else:
@@ -136,6 +154,8 @@ def loans():
 @app.route('/editprofile/<username>', methods=['GET', 'POST'])
 @login_required
 def edit_profile(username):
+    """Endpoint to edit a user profile. 
+    """
     form = ProfileForm()
     if form.validate_on_submit():
         if current_user.type_of_user in [1, 2] or username == current_user.username:
@@ -167,6 +187,8 @@ def edit_profile(username):
 @app.route('/editloan/<loanid>', methods=['GET', 'POST'])
 @login_required
 def editloan(loanid):
+    """Endpoint to edit loans. Needs loan id
+    """
     form = EditLoanForm()
     if request.method == 'POST':
         if current_user.type_of_user != 0:
@@ -207,7 +229,17 @@ def editloan(loanid):
 
 @app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/user", methods=['POST'])
 def api_create_user():
+    """API endpoint to create new users for the system
+    """
     data = request.get_json()
+    if data == None:
+        return jsonify({"message": "No data received"})
+    if "username" not in data.keys():
+        return jsonify({"message": "No username specified"})
+    if "password" not in data.keys():
+        return jsonify({"message": "No password specified"})
+    if "email" not in data.keys(): #Regex must be added to check if valid email 
+        return jsonify({"message": "No email specified"})
     user = User(username=data["username"], email=data["email"])
     user.set_password(data["password"])
     db.session.add(user)    
@@ -215,7 +247,10 @@ def api_create_user():
     return jsonify({"message": "User "+data["username"]+" created"})
 
 def token_required(func):
-    @wraps(func)
+    """Decorater for checking if supplied token is valid and assign the user 
+    to current user
+    """
+    @wraps(func) 
     def decorated_func(*args, **kwargs):
         token = None
         if 'x-access-token' in request.headers:
@@ -230,22 +265,26 @@ def token_required(func):
         return func(current_user,*args,**kwargs)
     return decorated_func
 
-@app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/login",methods=['GET'])
+@app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/login", methods=['GET'])
 def api_login():
+    """API endpoint for user to login with username and password and get JWT for further authentication
+    """
     auth = request.authorization
     if not auth or not auth.username or not auth.password:
         return make_response("COund not verify",401,{'WWW-Authenticate':'Basic realm="Login required"'})
-    user = User.query.filter_by(username=auth.username).first()
+    user = User.query.filter_by(username=auth.username).first() 
     if not user:
         return make_response("COund not verify",401,{'WWW-Authenticate':'Basic realm="Login required"'})
     if user.check_password(auth.password):
-        token = jwt.encode({'username': auth.username, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY'])
+        token = jwt.encode({'username': auth.username, 'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=30)}, app.config['SECRET_KEY']) #Generate token use keypairs or a better algorith rather than using a secret key
         return jsonify({"token": token.decode('UTF-8')})
     return make_response("COund not verify",401,{'WWW-Authenticate':'Basic realm="Login required"'})
 
 @app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/users",methods=['GET'])
 @token_required
 def api_users(current_user):
+    """ API endpint to get all users. Not accessible to customers
+    """
     if current_user.type_of_user == 0:
         return jsonify({"Message": "Unauthorized"}), 403
     else:
@@ -257,17 +296,33 @@ def api_users(current_user):
 @app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/loans",methods=['GET'])
 @token_required
 def api_loans(current_user):
-    if current_user.type_of_user == 0:
-        loans = Loan.query.filter_by(user=current_user.id)
+    """API end point to get loans. Accessble to everyone but the reponse/data availability depends on the user type.
+    Parameters for filtering supported are username,create_date,edit_date and state.
+    """
+    if not (request.args.get('username') and  request.args.get('create_date') and request.args.get('edit_date') and request.args.get('state')):
+        if current_user.type_of_user == 0:
+            loans = Loan.query.filter_by(user=current_user.id)
+        else:
+            loans = Loan.query.all()
+        result = loans_schema.dump(loans)
     else:
-        loans = Loan.query.all()
-    result = loans_schema.dump(loans)
+        loans = Loan.query
+        if request.args.get('username'):
+            loan.filter_by(user=request.args.get('username'))
+        if request.args.get('create_date'):
+            loans.filter_by(create_date=request.args.get('create_date'))
+        if request.args.get('edit_date'):
+            loans.filter_by(edit_date=request.args.get('edit_date'))
+        if request.args.get('state'):
+            loans.filter_by(state=request.args.get('state'))
+        result = loans_schema.dump(loans.all())
     return jsonify(result.data)
 
 @app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/loan/<id>",methods=['GET'])
 @token_required
 def api_loan(current_user, id):
-    print(request.headers)
+    """API end point for getting a specific loan. Needs the id of the loan to be specified. 
+    """
     loan = Loan.query.filter_by(id=id).first()
     if current_user.type_of_user == 0 and loan.user == current_user.id:
         result = loan_schema.dump(loan).data
@@ -279,7 +334,9 @@ def api_loan(current_user, id):
 
 @app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/user/<username>",methods=['GET'])
 @token_required
-def api_user(current_user,username):
+def api_user(current_user, username):
+    """API endpoint to get specific information about a certain username
+    """
     user = User.query.filter_by(username=username).first()
     if current_user.type_of_user == 0 and user.username == current_user.username:
         result = user_schema.dump(user).data
@@ -288,3 +345,128 @@ def api_user(current_user,username):
     else:
         result = {"Message": "Unauthorized"}
     return jsonify(result)
+
+@app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/createloan",methods=['POST'])
+@token_required
+def api_create_loan(current_user):
+    """API endpoint to create new loans. Only accessible by users of type agent
+    """
+    if current_user.type_of_user != 1:
+        return jsonify({"Message": "Unauthorized"})
+    else:
+        data = request.get_json()
+        if not data:
+            return jsonify({"message": "No data"})
+        if "userid" not in data.keys():
+            return jsonify({"message": "userid not found"})
+        if "principle" not in data.keys():
+            return jsonify({"message": "principle not found"})
+        if "roi" not in data.keys():
+            return jsonify({"message": "roi not found"})
+        if "tenure" not in data.keys():
+            return jsonify({"message": "tenure not found"})
+        loan = Loan(user=int(data["userid"]), principle=data["principle"], roi=data["roi"], tenure=data["tenure"])
+        loan.create_uid=current_user.id
+        db.session.add(loan)    
+        db.session.commit()
+        return jsonify({"message": "Loan created"})
+
+@app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/approve/<id>",methods=['POST'])
+@token_required
+def api_approve_loan(current_user, id):
+    """API endpoint to accept a loan. Only works if user is of type admin
+    """
+    if current_user.type_of_user != 2:
+        return jsonify({"Message": "Unauthorized"})
+    else:
+        loan = Loan.query.filter_by(id=id).first()
+        if loan:
+            loan.state = 2
+            db.session.commit()
+            return jsonify({"message": "Loan approved"})
+        else:
+            return jsonify({"message": "Loan not found"})
+
+
+
+@app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/reject/<id>",methods=['POST'])
+@token_required
+def api_reject_loan(current_user, id):
+    """API endpoint to reject loans. Only works if user is of type admin
+    """
+    if current_user.type_of_user != 2:
+        return jsonify({"Message": "Unauthorized"})
+    else:
+        loan = Loan.query.filter_by(id=id).first() 
+        if loan:
+            loan.state = 1
+            db.session.commit()
+            return jsonify({"message": "Loan rejected"})
+        else:
+            return jsonify({"message": "Loan not found"})
+
+@app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/user/<username>",methods=['PUT'])
+@token_required
+def api_user_edit(current_user, username):
+    """API endpoint to edit a user
+    """
+    data = request.get_json()
+    edit = False
+    user = User.query.filter_by(username=username).first()
+    if user:
+        if (current_user.username == username or current_user.type_of_user in [1,2]) and data["email"]:
+            user.email = data["email"]
+            edit = True
+        if current_user.type_of_user == 2 and data["type_of_user"]:
+            user.type_of_user=data["type_of_user"]
+            edit = True
+        if edit:
+            user.edit_date = datetime.datetime.utcnow().date()
+            user.edit_uid = current_user.id
+            db.session.commit()
+            return jsonify({"message": "User Edited"})
+        else:
+            return jsonify({"message": "User Not edited"})
+    else:
+        return jsonify({"message": "User Not found"})
+
+@app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/loan/<id>",methods=['PUT'])
+@token_required
+def api_loan_edit(current_user, id):
+    """API endpoint to edit loans. 
+    """
+    if current_user.type_of_user in [0,2] :
+        return jsonify({"message": "Unauthorized"})
+    data = request.get_json()
+    edit = False
+    loan = Loan.query.filter_by(id=id).first()
+    loanold = LoanRollback .query.filter_by(loan=id).first()
+    if loan:
+        if loan.state != 0:
+            return jsonify({"message": "Loan not in editable state"})
+        else:
+            if not loanold:
+                loanold = LoanRollback(parent=loan.id,tenure=loan.tenure,principle=loan.principle,roi=loan.roi)
+                db.session.add(loanold)    
+                db.session.commit()
+            if data["roi"]:
+                loanold.roi=loan.roi
+                loan.roi = data["roi"]
+                edit = True
+            if data["principle"]:
+                loanold.principle=loan.principle
+                loan.principle = data["principle"]
+                edit = True
+            if data["tenure"]:
+                loanold.tenure=loan.tenure
+                loan.tenure = data["tenure"]
+                edit = True
+        if edit:
+            loan.edit_date = datetime.datetime.utcnow().date()
+            loan.edit_uid = current_user.id
+            db.session.commit()
+            return jsonify({"message": "Loan Edited"})
+        else:
+            return jsonify({"message": "Loan not edited"})
+    else:
+        return jsonify({"message": "Loan not found"})
