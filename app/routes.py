@@ -4,6 +4,7 @@ from werkzeug.urls import url_parse
 import datetime 
 import jwt # For jwt
 from functools import wraps
+from dateutil import tz
 from app import app,login,db
 from app.forms import LoginForm, ProfileForm, RegistrationForm, LoanForm, EditLoanForm, FilterForm
 from app.models import User,UserSchema,Loan,LoanSchema,LoanRollback
@@ -51,7 +52,7 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     form = LoginForm()
-    if form.validate_on_submit():
+    if form.validate_on_submit() or request.method == 'POST':
         user = User.query.filter_by(username=form.username.data).first()
         if user is None or not user.check_password(form.password.data):
             flash('Invalid username or password')
@@ -80,7 +81,7 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     form = RegistrationForm()
-    if form.validate_on_submit():
+    if form.validate_on_submit() or request.method == 'POST':
         user = User(username=form.username.data, email=form.email.data)
         user.set_password(form.password.data)
         db.session.add(user)    
@@ -192,6 +193,10 @@ def editloan(loanid):
     form = EditLoanForm()
     if request.method == 'POST':
         if current_user.type_of_user != 0:
+            loanold = LoanRollback.query.filter_by(loan=id).first()
+            if not loanold:
+                loanold = LoanRollback(parent=loan.id,tenure=loan.tenure,principle=loan.principle,roi=loan.roi)
+                db.session.add(loanold)
             loan = Loan.query.filter_by(id=loanid).first_or_404()
             if form.approve.data == True and current_user.type_of_user == 2:
                 loan.state = 2
@@ -201,7 +206,16 @@ def editloan(loanid):
                 loan.state = 1
                 db.session.commit()
                 return redirect(url_for('editloan',loanid=loan.id))
+            if form.rollback.data == True and current_user.type_of_user == 1:
+                loan.roi,loanold.roi = loanold.roi,loan.roi
+                loan.principle, loanold.principle = loanold.principle, loan.principle
+                loan.tenure,loanold.tenure = loanold.tenure,loan.tenure
+                db.session.commit()
+                return redirect(url_for('editloan',loanid=loan.id))
             elif form.submit.data == True and current_user.type_of_user == 1:
+                loanold.roi = loan.roi
+                loanold.tenure = loan.tenure
+                loanold.principle = loan.principle
                 loan.roi = form.roi.data
                 loan.tenure = form.tenure.data
                 loan.principle = form.principle.data
@@ -299,12 +313,17 @@ def api_loans(current_user):
     """API end point to get loans. Accessble to everyone but the reponse/data availability depends on the user type.
     Parameters for filtering supported are username,create_date,edit_date and state.
     """
+    from_zone = tz.gettz('UTC')
+    to_zone = tz.gettz(request.headers["timezone"]) if 'timezone' in request.headers else tz.gettz("India/Delhi")
     if not (request.args.get('username') and  request.args.get('create_date') and request.args.get('edit_date') and request.args.get('state')):
         if current_user.type_of_user == 0:
             loans = Loan.query.filter_by(user=current_user.id)
         else:
             loans = Loan.query.all()
         result = loans_schema.dump(loans)
+        for item in result.data:
+            item["create_date"]=datetime.datetime.strptime(item["create_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(tz.gettz())
+            item["edit_date"]=datetime.datetime.strptime(item["edit_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
     else:
         loans = Loan.query
         if request.args.get('username'):
@@ -316,6 +335,9 @@ def api_loans(current_user):
         if request.args.get('state'):
             loans.filter_by(state=request.args.get('state'))
         result = loans_schema.dump(loans.all())
+        for item in result.data:
+            item["create_date"]=datetime.datetime.strptime(item["create_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
+            item["edit_date"]=datetime.datetime.strptime(item["edit_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
     return jsonify(result.data)
 
 @app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/loan/<id>",methods=['GET'])
@@ -323,11 +345,17 @@ def api_loans(current_user):
 def api_loan(current_user, id):
     """API end point for getting a specific loan. Needs the id of the loan to be specified. 
     """
+    from_zone = tz.gettz('UTC')
+    to_zone = tz.gettz(request.headers["timezone"]) if 'timezone' in request.headers else tz.gettz("India/Delhi")
     loan = Loan.query.filter_by(id=id).first()
     if current_user.type_of_user == 0 and loan.user == current_user.id:
         result = loan_schema.dump(loan).data
+        result["create_date"]=datetime.datetime.strptime(result["create_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
+        result["edit_date"]=datetime.datetime.strptime(result["edit_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
     elif current_user.type_of_user in [2,1]:
         result = loan_schema.dump(loan).data
+        result["create_date"]=datetime.datetime.strptime(result["create_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
+        result["edit_date"]=datetime.datetime.strptime(result["edit_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
     else:
         result = {"Message": "Unauthorized"}
     return jsonify(result)
@@ -337,11 +365,17 @@ def api_loan(current_user, id):
 def api_user(current_user, username):
     """API endpoint to get specific information about a certain username
     """
+    from_zone = tz.gettz('UTC')
+    to_zone = tz.gettz(request.headers["timezone"]) if 'timezone' in request.headers else tz.gettz("India/Delhi")
     user = User.query.filter_by(username=username).first()
     if current_user.type_of_user == 0 and user.username == current_user.username:
         result = user_schema.dump(user).data
+        result["create_date"]=datetime.datetime.strptime(result["create_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
+        result["edit_date"]=datetime.datetime.strptime(result["edit_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
     elif current_user.type_of_user in [2,1]:
         result = user_schema.dump(user).data
+        result["create_date"]=datetime.datetime.strptime(result["create_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
+        result["edit_date"]=datetime.datetime.strptime(result["edit_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
     else:
         result = {"Message": "Unauthorized"}
     return jsonify(result)
@@ -366,6 +400,7 @@ def api_create_loan(current_user):
         if "tenure" not in data.keys():
             return jsonify({"message": "tenure not found"})
         loan = Loan(user=int(data["userid"]), principle=data["principle"], roi=data["roi"], tenure=data["tenure"])
+        loan.emicalc()
         loan.create_uid=current_user.id
         db.session.add(loan)    
         db.session.commit()
@@ -404,6 +439,28 @@ def api_reject_loan(current_user, id):
             return jsonify({"message": "Loan rejected"})
         else:
             return jsonify({"message": "Loan not found"})
+
+@app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/rollback/<id>",methods=['POST'])
+@token_required
+def api_rollback_loan(current_user, id):
+    """API endpoint to rollback loans. Only works if user is of type agent
+    """
+    if current_user.type_of_user != 1:
+        return jsonify({"Message": "Unauthorized"})
+    else:
+        loan = Loan.query.filter_by(id=id).first()
+        loanold = LoanRollback.query.filter_by(loan=id).first()
+        if not loanold:
+            return jsonify({"Message": "No Previos available"})
+        if loan:
+                loan.roi,loanold.roi = loanold.roi,loan.roi
+                loan.principle, loanold.principle = loanold.principle, loan.principle
+                loan.tenure,loanold.tenure = loanold.tenure,loan.tenure
+                db.session.commit()
+                return jsonify({"message": "Loan Rollbacked to prev version"})
+        else:
+            return jsonify({"message": "Loan not found"})
+
 
 @app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/user/<username>",methods=['PUT'])
 @token_required

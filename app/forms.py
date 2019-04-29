@@ -51,6 +51,7 @@ class EditLoanForm(FlaskForm):
     tenure = IntegerField("Tenure(In Months)", validators=[DataRequired()])
     submit = SubmitField('Update')
     approve = SubmitField('Approve')
+    rollback = SubmitField('RollBack')
     reject = SubmitField('Reject')
 
 class RegistrationForm(FlaskForm):

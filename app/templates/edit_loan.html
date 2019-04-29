@@ -46,5 +46,8 @@
     <p>{{ form.approve() }}</p>
     <p>{{ form.reject() }}</p>
     {%endif%}
+    {% if current_user.type_of_user == 1 and state == 0 %}
+    <p>{{ form.reject() }}</p>
+    {%endif%}
 </form>
 {% endblock %}
