@@ -1,44 +1,45 @@
 from flask import render_template, flash, redirect,url_for,request,jsonify,make_response
 from flask_login import login_user,current_user,logout_user,login_required # Login and session management 
-from werkzeug.urls import url_parse
+from werkzeug.urls import url_parse #To get the next url 
 import datetime 
 import jwt # For jwt
-from functools import wraps
-from dateutil import tz
-from app import app,login,db
-from app.forms import LoginForm, ProfileForm, RegistrationForm, LoanForm, EditLoanForm, FilterForm
-from app.models import User,UserSchema,Loan,LoanSchema,LoanRollback
+from functools import wraps # To define decorators
+from dateutil import tz #Fore timezone management
+from app import app,login,db #app specific stuff
+from app.forms import LoginForm, ProfileForm, RegistrationForm, LoanForm, EditLoanForm, FilterForm #Flask-wtf forms
+from app.models import User,UserSchema,Loan,LoanSchema,LoanRollback #SQLAlchemy models
 
-user_schema = UserSchema(strict=True,exclude=['password_hash'])
-users_schema = UserSchema(many=True,strict=True,exclude=['password_hash'])
-loan_schema = LoanSchema(strict=True)
-loans_schema = LoanSchema(many=True, strict=True)
+user_schema = UserSchema(strict=True,exclude=['password_hash']) #Marshmallow Schema
+users_schema = UserSchema(many=True, strict=True, exclude=[
+                          'password_hash'])  # Marshmallow Schema for multiple
+loan_schema = LoanSchema(strict=True)  # Marshmallow Schema
+loans_schema = LoanSchema(many=True, strict=True)  # Marshmallow Schema for multiple
 
-@app.route('/', methods=['GET'])
+@app.route('/', methods=['GET']) #defining rotes and http methods
 @app.route('/index', methods=['GET'])
 def index():
     """Endpoint for home
     """
-    return render_template("index.html")
+    return render_template("index.html") #render html template (Contains jinja templating)
 
 @app.route('/users',methods=['GET'])
 @login_required
 def users():
     """Endpoint to get all users
     """
-    if current_user.type_of_user in [1,2]:
+    if current_user.type_of_user in [1,2]: #Make sure use in specific user group can be better implemented
         result = User.query.all()
-        return render_template("users.html",users=result)
+        return render_template("users.html",users=result) # Passing values(all users) to be used by jinja templating engine
     else:
-        flash('You are not authorised to view this!')
+        flash('You are not authorised to view this!')  #Flashing messages 
         return redirect(url_for('index'))
 
-@app.route('/user/<username>',methods=['GET'])
-@login_required
-def user(username):
+@app.route('/user/<username>',methods=['GET']) # Getting parameters in the url
+@login_required #login required to access the specific route
+def user(username):  # Getting parameters in the url into a variable
     """Endpoint to get information of a specific user
     """
-    if current_user.type_of_user in [1,2] or username == current_user.username:
+    if current_user.type_of_user in [1,2] or username == current_user.username: #Checks on the user type
         user = User.query.filter_by(username=username).first_or_404()
         return render_template("user.html",user=user)
     else:
@@ -49,27 +50,27 @@ def user(username):
 def login():
     """Endpoint to  log the user in
     """
-    if current_user.is_authenticated:
+    if current_user.is_authenticated: #used to check the user is already logged in
         return redirect(url_for('index'))
-    form = LoginForm()
-    if form.validate_on_submit() or request.method == 'POST':
-        user = User.query.filter_by(username=form.username.data).first()
-        if user is None or not user.check_password(form.password.data):
+    form = LoginForm() #Creating a form instance
+    if form.validate_on_submit() or request.method == 'POST': #Checking if a post request or if the button is submitted
+        user = User.query.filter_by(username=form.username.data).first() # Getting the user with specific filters
+        if user is None or not user.check_password(form.password.data): # Authenticating the user
             flash('Invalid username or password')
             return redirect(url_for('login'))
         login_user(user, remember=form.remember_me.data)
         next_page = request.args.get('next')
-        if not next_page or url_parse(next_page).netloc != '':
+        if not next_page or url_parse(next_page).netloc != '': #Passing on the the page wherethe user is supposed to be redirected after logging in
             next_page = url_for('index')
         return redirect(next_page)
-    return render_template('login.html', title='Sign In', form=form)
+    return render_template('login.html', title='Sign In', form=form) #passing the form to jinja template
 
 @app.route('/logout')
 @login_required
 def logout():
     """TO logout the user
     """
-    logout_user()
+    logout_user() #Logout the user
     return redirect(url_for('index'))
     if current_user.is_authenticated:
         return redirect(url_for('index'))
@@ -84,8 +85,8 @@ def register():
     if form.validate_on_submit() or request.method == 'POST':
         user = User(username=form.username.data, email=form.email.data)
         user.set_password(form.password.data)
-        db.session.add(user)    
-        db.session.commit()
+        db.session.add(user)     #add user to db
+        db.session.commit()  # commit user to db
         flash('Congratulations, you are now a registered user!')
         return redirect(url_for('login'))
     return render_template('register.html', title='Register', form=form)
@@ -113,7 +114,7 @@ def createloan():
 
 @app.route('/search', methods=['GET', 'POST'])
 @login_required
-def search():
+def search(): # Not a very good  implementation
     """Endpoint to filter out loan results
     """
     form = FilterForm()
@@ -198,19 +199,22 @@ def editloan(loanid):
                 loanold = LoanRollback(parent=loan.id,tenure=loan.tenure,principle=loan.principle,roi=loan.roi)
                 db.session.add(loanold)
             loan = Loan.query.filter_by(id=loanid).first_or_404()
-            if form.approve.data == True and current_user.type_of_user == 2:
+            if form.approve.data == True and current_user.type_of_user == 2: #perform action based on button pressed
                 loan.state = 2
                 db.session.commit()
+                flash('Loan approved!')
                 return redirect(url_for('editloan',loanid=loan.id))
             elif form.reject.data == True and current_user.type_of_user == 2:
                 loan.state = 1
                 db.session.commit()
+                flash('Loan rejected!')
                 return redirect(url_for('editloan',loanid=loan.id))
             if form.rollback.data == True and current_user.type_of_user == 1:
                 loan.roi,loanold.roi = loanold.roi,loan.roi
                 loan.principle, loanold.principle = loanold.principle, loan.principle
                 loan.tenure,loanold.tenure = loanold.tenure,loan.tenure
                 db.session.commit()
+                flash('Loan rolled back to previos version!')
                 return redirect(url_for('editloan',loanid=loan.id))
             elif form.submit.data == True and current_user.type_of_user == 1:
                 loanold.roi = loan.roi
@@ -241,8 +245,8 @@ def editloan(loanid):
         state = STATE[loan.state]
         return render_template('edit_loan.html', title='Edit Loan', form=form, state=state)
 
-@app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/user", methods=['POST'])
-def api_create_user():
+@app.route('/' + app.config["API_FOR"] + '/' + app.config["API_VERSION"] + "/user", methods=['POST']) #api end point to create user
+def api_create_user(): 
     """API endpoint to create new users for the system
     """
     data = request.get_json()
@@ -272,7 +276,7 @@ def token_required(func):
         if not token:
             return jsonify({"Message": "Token not found"}), 401
         try:
-            data = jwt.decode(token, app.config['SECRET_KEY'])
+            data = jwt.decode(token, app.config['SECRET_KEY']) #Decoding the jwt token to verify the user
             current_user = User.query.filter_by(username=data["username"]).first()
         except:
             return jsonify({"Message": "Token Invalid"}), 401
@@ -303,7 +307,7 @@ def api_users(current_user):
         return jsonify({"Message": "Unauthorized"}), 403
     else:
         users = User.query.all()
-        result = users_schema.dump(users)
+        result = users_schema.dump(users) #serializing using marshmallow schema
         return jsonify(result.data)
         
 
@@ -314,7 +318,7 @@ def api_loans(current_user):
     Parameters for filtering supported are username,create_date,edit_date and state.
     """
     from_zone = tz.gettz('UTC')
-    to_zone = tz.gettz(request.headers["timezone"]) if 'timezone' in request.headers else tz.gettz("India/Delhi")
+    to_zone = tz.gettz(request.headers["timezone"]) if 'timezone' in request.headers else tz.gettz("India/Delhi") #getting the timezone
     if not (request.args.get('username') and  request.args.get('create_date') and request.args.get('edit_date') and request.args.get('state')):
         if current_user.type_of_user == 0:
             loans = Loan.query.filter_by(user=current_user.id)
@@ -322,7 +326,7 @@ def api_loans(current_user):
             loans = Loan.query.all()
         result = loans_schema.dump(loans)
         for item in result.data:
-            item["create_date"]=datetime.datetime.strptime(item["create_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(tz.gettz())
+            item["create_date"]=datetime.datetime.strptime(item["create_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone) # Converting time to the timezone
             item["edit_date"]=datetime.datetime.strptime(item["edit_date"][0:10], '%Y-%m-%d').replace(tzinfo=from_zone).astimezone(to_zone)
     else:
         loans = Loan.query

@@ -1,6 +1,10 @@
+<!-- Extending base class -->
 {% extends "base.html" %}
+<!-- Page conent in block content -->
 {% block content %}
 <h1> Edit</h1>
+
+<!-- Form -->
 <form action="" method="post">
     {{form.hidden_tag() }}
     {% if current_user.type_of_user == 2%}
@@ -41,7 +45,7 @@
     </p>
     <p>{{ form.submit() }}</p>
     {%endif%}
-
+    <!-- User check on form to hide fields based on usertype -->
     {% if current_user.type_of_user == 2 and state == 0 %}
     <p>{{ form.approve() }}</p>
     <p>{{ form.reject() }}</p>

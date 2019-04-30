@@ -1,6 +1,8 @@
+<!-- Base template used -->
 <html>
 
 <head>
+    <!-- Jinja templating -->
     {% if title %}
     <title>{{ title }} - Loan Management</title>
     {% else %}
@@ -13,6 +15,7 @@
             border: 1px solid black;
         }
     </style>
+    <!-- Adding moment.js -->
     {% block scripts %}
     {{ moment.include_moment() }}
     {% endblock %}
