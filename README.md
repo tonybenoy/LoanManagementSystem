@@ -1,5 +1,5 @@
 ## The app
-As per the requiremts the web app is built using flask.
+Webapp built with flask
 ORM used to define the models is SQLAlchemy.
 Database used is postgresql.
 Marshmallow is used to serialize the models for API.
