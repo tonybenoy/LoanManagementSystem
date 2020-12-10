@@ -1,4 +1,5 @@
 ## The app
+
 Webapp built with flask
 ORM used to define the models is SQLAlchemy.
 Database used is postgresql.
@@ -14,8 +15,8 @@ An alternatibe to this would be to take a linux base image and built all of this
 flaskapp contains docker-entrypoint.sh to perform all the required migrations for the webapp to work.
 docker-entrypoint-initdb.d in postgres contains a shell script to create multiple databases for both the app and the testing.
 
-
 ## Usage
+
 ```
 $ docker-compose build
 $ docker-compose up -d
