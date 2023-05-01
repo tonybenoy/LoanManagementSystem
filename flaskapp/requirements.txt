@@ -4,7 +4,7 @@ chardet==3.0.4
 Click==7.0
 coverage==4.5.3
 decorator==4.4.0
-Flask==1.0.2
+Flask==2.3.2
 Flask-Login==0.4.1
 flask-marshmallow==0.10.0
 Flask-Migrate==2.4.0
